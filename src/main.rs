@@ -1,6 +1,5 @@
 use ndarray::{
-    s, Array, Array1, Array2, Array3, ArrayBase, ArrayD, Axis, Data, Dimension, Ix2, RemoveAxis,
-    Zip,
+    s, Array1, Array2, Array3, ArrayBase, ArrayD, Axis, Data, Dimension, Ix2, RemoveAxis,
 };
 //use ndarray::Array;
 use ndarray_rand::rand_distr::Uniform;
@@ -139,6 +138,29 @@ impl ActivationFunction {
         }
         // Ensure the output is dynamically dimensioned for flexibility
     }
+
+    fn backward(
+        &self,
+        input: &ArrayD<f32>,
+        grad_output: &ArrayD<f32>,
+    ) -> Result<ArrayD<f32>, Box<dyn Error>> {
+        match self {
+            ActivationFunction::Relu => {
+                Ok(input.mapv(|x| if x > 0.0 { 1.0 } else { 0.0 }) * grad_output)
+            }
+            ActivationFunction::Sigmoid => {
+                let sigmoid = self.apply(input)?;
+                let ones = ArrayD::<f32>::from_elem(sigmoid.raw_dim(), 1.0);
+                let derivative = &sigmoid * &(ones - &sigmoid);
+                Ok(derivative * grad_output)
+            }
+            ActivationFunction::Softmax => {
+                let softmax_output = self.apply(input)?;
+                Ok(softmax_output - grad_output)
+            }
+            _ => Err("Something went wrong in backprop".into()),
+        }
+    }
 }
 
 struct FullyConnected {
@@ -187,7 +209,7 @@ fn flatten(input: &ArrayD<f32>) -> ArrayD<f32> {
 enum LossFunction {
     MeanSquaredError,
     CrossEntropy,
-    // You can add more loss functions here later, e.g., CrossEntropy
+    // You can add more loss functions here later, e.g., MAE
 }
 
 impl LossFunction {
